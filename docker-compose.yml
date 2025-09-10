@@ -1,0 +1,91 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15
+    container_name: protein_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: protein
+      POSTGRES_PASSWORD: proteinpass
+      POSTGRES_DB: proteindb
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: protein_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  hub:
+    build:
+      context: .
+      dockerfile: docker/hub/Dockerfile
+    container_name: protein_hub
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgres://protein:proteinpass@postgres:5432/proteindb
+      REDIS_URL: redis://redis:6379/0
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    container_name: protein_worker
+    depends_on:
+      - hub
+      - redis
+    environment:
+      HUB_URL: http://hub:8000
+      REDIS_URL: redis://redis:6379/0
+
+  admin:
+    build:
+      context: .
+      dockerfile: docker/admin/Dockerfile
+    container_name: protein_admin
+    depends_on:
+      - hub
+    ports:
+      - "3000:3000"
+    environment:
+      HUB_URL: http://hub:8000
+
+  client:
+    build:
+      context: .
+      dockerfile: docker/client/Dockerfile
+    container_name: protein_client
+    depends_on:
+      - hub
+    environment:
+      HUB_URL: http://hub:8000
+
+  prometheus:
+    image: prom/prometheus
+    container_name: protein_prometheus
+    volumes:
+      - ./metrics/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana
+    container_name: protein_grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  db_data:
+  grafana_data:
