@@ -1,5 +1,14 @@
-FROM python:3.11-slim
+FROM --platform=linux/amd64 node:18-slim
+
 WORKDIR /app
-COPY client/ /app/client/
-RUN pip install --no-cache-dir requests
-CMD ["python", "client/main.py"]
+
+# Install http-server globally
+RUN npm install -g --unsafe-perm http-server
+
+# Copy client code into container
+COPY . /app
+
+EXPOSE 8081
+
+# Default command: serve app on port 8081
+CMD ["http-server", ".", "-p", "8081"]
